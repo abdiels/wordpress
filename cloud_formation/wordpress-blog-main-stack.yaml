@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://abdiels-wordpress-app.s3.amazonaws.com/cf-templates/wordpress-network.yaml
+      Parameters:
+        VPCName: "WordpressBlogVPC"
+
+  DatabaseStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://abdiels-wordpress-app.s3.amazonaws.com/cf-templates/wordpress-db.yaml
+      Parameters:
+        VpcId: !GetAtt NetworkStack.Outputs.VPCId
+        DBSubnetGroupName: !GetAtt NetworkStack.Outputs.DBSubnetGroup
+
+  WordpressECSAppStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://abdiels-wordpress-app.s3.amazonaws.com/cf-templates/wordpress-ecs-cluster.yaml
+      Parameters:
+        VpcId: !GetAtt NetworkStack.Outputs.VPCId
+        PublicSubnet0: !GetAtt NetworkStack.Outputs.PublicSubnet0
+        PublicSubnet1: !GetAtt NetworkStack.Outputs.PublicSubnet1
+        PrivateSubnet0: !GetAtt NetworkStack.Outputs.PrivateSubnet0
+        PrivateSubnet1: !GetAtt NetworkStack.Outputs.PrivateSubnet1
+        FilesystemId: !GetAtt NetworkStack.Outputs.EFSFSId
+        AccessPoint: !GetAtt NetworkStack.Outputs.EFSAccessPoint
+        WordpressDB: !GetAtt DatabaseStack.Outputs.RDSEndpointAddress
+

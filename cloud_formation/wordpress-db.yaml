@@ -1,0 +1,44 @@
+---
+  AWSTemplateFormatVersion: "2010-09-09"
+
+  Description: "Creates a Serverless Aurora MySQL RDS Instance"
+  Parameters:
+    VpcId:
+      Description: The VPC ID
+      Type: AWS::EC2::VPC::Id
+
+    DBSubnetGroupName:
+      Description: Name of the database subnet group
+      Type: String
+
+  Resources:
+    DBSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: RDS Security Group
+        VpcId: !Ref VpcId
+        GroupName: Wordpress-Demo-RDS-SG
+        SecurityGroupIngress:
+          - IpProtocol: "tcp"
+            FromPort: 3306
+            ToPort: 3306
+            CidrIp: 10.0.0.0/16
+
+    WordpressDB:
+      Type: AWS::RDS::DBCluster
+      Properties:
+        DatabaseName: wordpress
+        Engine: aurora-mysql
+        EngineMode: serverless
+        DBSubnetGroupName: !Ref DBSubnetGroupName
+        MasterUsername: admin
+        MasterUserPassword: supersecretpassword
+        VpcSecurityGroupIds:
+          - !Ref DBSecurityGroup
+
+  Outputs:
+    RDSEndpointAddress:
+      Description: "RDS Endpoint Address"
+      Value: !GetAtt WordpressDB.Endpoint.Address
+      Export:
+        Name: !Sub "${AWS::Region}-${AWS::StackName}-WordpressDB"

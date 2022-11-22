@@ -1,0 +1,206 @@
+---
+  AWSTemplateFormatVersion: "2010-09-09"
+
+  Description: "Creates an ECS Fargate Cluster to run Wordpress"
+  Parameters:
+    VpcId:
+      Description: The VPC ID
+      Type: AWS::EC2::VPC::Id
+    PublicSubnet0:
+      Description: The Subnet ID
+      Type: AWS::EC2::Subnet::Id
+    PublicSubnet1:
+      Description: The Subnet ID
+      Type: AWS::EC2::Subnet::Id
+    PrivateSubnet0:
+      Description: The Subnet ID
+      Type: AWS::EC2::Subnet::Id
+    PrivateSubnet1:
+      Description: The Subnet ID
+      Type: AWS::EC2::Subnet::Id
+    FilesystemId:
+      Type: String
+    AccessPoint:
+      Type: String
+    WordpressDB:
+      Type: String
+
+  Resources:
+    ALBSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: ALB Security Group
+        VpcId: !Ref VpcId
+        GroupName: Wordpress-Demo-ALB-SG
+        SecurityGroupIngress:
+          - IpProtocol: "tcp"
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+
+    WordPressALB:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Name: wof-load-balancer
+        SecurityGroups:
+          - !Ref ALBSecurityGroup
+        Subnets:
+          - !Ref PublicSubnet0
+          - !Ref PublicSubnet1
+
+    WordPressTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      DependsOn: WordPressALB
+      Properties:
+        Name: WordPressTargetGroup
+        TargetType: ip
+        Port: 8080
+        Protocol: HTTP
+        HealthCheckPort: 8080
+        VpcId: !Ref VpcId
+
+    WordPressALBListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      DependsOn: WordPressTargetGroup
+      Properties:
+        LoadBalancerArn: !Ref WordPressALB
+        Protocol: "HTTP"
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            ForwardConfig:
+              TargetGroups:
+                - TargetGroupArn: !Ref WordPressTargetGroup
+                  Weight: 1
+
+    WordPressTask:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        RequiresCompatibilities:
+          - "FARGATE"
+
+        NetworkMode: "awsvpc"
+        Cpu: 1024
+        Memory: 3072
+
+        ContainerDefinitions:
+          - Name: "wordpress"
+            PortMappings:
+              - ContainerPort: 8080
+                Protocol: tcp
+            MountPoints:
+              - ContainerPath: "/bitnami/wordpress"
+                SourceVolume: "wordpress"
+            Image: "bitnami/wordpress"
+            Environment:
+              - Name: "MARIADB_HOST"
+                Value: !Ref WordpressDB
+              - Name: "WORDPRESS_DATABASE_USER"
+                Value: "admin"
+              - Name: "WORDPRESS_DATABASE_PASSWORD"
+                Value: "supersecretpassword"  #TODO: This should come from secrets manager and rotate
+              - Name: "WORDPRESS_DATABASE_NAME"
+                Value: "wordpress"
+              - Name: "PHP_MEMORY_LIMIT"
+                Value: "512M"
+              - Name: "enabled"
+                Value: False
+              - Name: "ALLOW_EMPTY_PASSWORD"
+                Value: "yes"
+        Volumes:
+          - Name: "wordpress"
+            EFSVolumeConfiguration:
+              FilesystemId: !Ref FilesystemId
+              TransitEncryption: "ENABLED"
+              AuthorizationConfig:
+                AccessPointId: !Ref AccessPoint
+                IAM: "DISABLED"
+        Family: "wof-tutorial"
+
+    WordPressCluster:
+      Type: AWS::ECS::Cluster
+      Properties:
+        CapacityProviders:
+          - "FARGATE_SPOT"
+        ClusterName: ecs-fargate-wordpressexport  # TODO: Should this be a parameter or variable??
+
+    WordPressServiceSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: "Svc-WordPress-on-Fargate"
+        GroupName: "Svc-WordPress-on-Fargate"
+        SecurityGroupIngress:
+          IpProtocol: "tcp"
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          FromPort: 8080
+          ToPort: 8080
+
+        VpcId: !Ref VpcId
+
+    WordPressService:
+      Type: AWS::ECS::Service
+      Properties:
+        Cluster: !Ref WordPressCluster
+        DeploymentConfiguration:
+          MaximumPercent: 100
+          MinimumHealthyPercent: 0
+
+        DesiredCount: 2
+        LaunchType: "FARGATE"
+        LoadBalancers:
+          - ContainerName: "wordpress"
+            ContainerPort: 8080
+            TargetGroupArn: !Ref WordPressTargetGroup
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: "DISABLED"
+            SecurityGroups:
+              - !Ref WordPressServiceSG
+            Subnets:
+              - !Ref PrivateSubnet0
+              - !Ref PrivateSubnet1
+
+        PlatformVersion: 1.4.0
+        ServiceName: "wof-efs-rw-service"
+        TaskDefinition: !Ref WordPressTask
+
+    ECSScalableTarget:
+      Type: AWS::ApplicationAutoScaling::ScalableTarget
+      Properties:
+        MaxCapacity: 4
+        MinCapacity: 1
+        RoleARN:
+          Fn::Sub: 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService'
+        ServiceNamespace: ecs
+        ScalableDimension: 'ecs:service:DesiredCount'
+        ResourceId: !Join
+          - /
+          - - service
+            - !Ref WordPressCluster
+            - !GetAtt WordPressService.Name
+
+    ServiceScalingPolicyCPU:
+      Type: AWS::ApplicationAutoScaling::ScalingPolicy
+      Properties:
+        PolicyName: !Sub ${AWS::StackName}-target-tracking-cpu70
+        PolicyType: TargetTrackingScaling
+        ScalingTargetId: !Ref ECSScalableTarget
+        TargetTrackingScalingPolicyConfiguration:
+          TargetValue: 75.0
+          ScaleInCooldown: 60
+          ScaleOutCooldown: 60
+          PredefinedMetricSpecification:
+            PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+    ServiceScalingPolicyMem:
+      Type: AWS::ApplicationAutoScaling::ScalingPolicy
+      Properties:
+        PolicyName: !Sub ${AWS::StackName}-target-tracking-mem90
+        PolicyType: TargetTrackingScaling
+        ScalingTargetId: !Ref ECSScalableTarget
+        TargetTrackingScalingPolicyConfiguration:
+          TargetValue: 90.0
+          ScaleInCooldown: 60
+          ScaleOutCooldown: 60
+          PredefinedMetricSpecification:
+            PredefinedMetricType: ECSServiceAverageMemoryUtilization
