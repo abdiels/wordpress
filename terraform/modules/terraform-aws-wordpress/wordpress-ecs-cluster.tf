@@ -203,7 +203,6 @@ resource "aws_appautoscaling_target" "ECSScalableTarget" {
 }
 
 resource "aws_appautoscaling_policy" "ServiceScalingPolicyCPU" {
-  #   TODO: HOW??
   name        = "AWS::StackName-target-tracking-cpu70"
   policy_type = "TargetTrackingScaling"
   resource_id = aws_appautoscaling_target.ECSScalableTarget.id
@@ -220,7 +219,6 @@ resource "aws_appautoscaling_policy" "ServiceScalingPolicyCPU" {
 }
 
 resource "aws_appautoscaling_policy" "ServiceScalingPolicyMem" {
-  #   TODO: HOW??
   name        = "AWS::StackName-target-tracking-mem90"
   policy_type = "TargetTrackingScaling"
   resource_id = aws_appautoscaling_target.ECSScalableTarget.id

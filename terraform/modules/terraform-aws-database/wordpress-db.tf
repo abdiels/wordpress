@@ -36,5 +36,3 @@ resource "aws_rds_cluster" "WordpressDB" {
   vpc_security_group_ids  = [aws_security_group.DBSecurityGroup.id]
   skip_final_snapshot     = true
 }
-
-

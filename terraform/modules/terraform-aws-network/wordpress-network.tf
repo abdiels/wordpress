@@ -5,8 +5,6 @@ resource "aws_vpc" "wordpress_vpc" {
   cidr_block = var.SubnetConfig["VPC_CIDR"]
   tags = {
     Name = var.VPCName
-    # "VPC Name Parameter" # TODO: How?
-    # Application = "Stack Name"  #TODO: how?
     Network = "Public"
   }
 }
@@ -19,7 +17,6 @@ resource "aws_subnet" "PublicSubnet0" {
 
   tags = {
     Name        = "VPCNameParameter-public-+ aws_wordpress_public_subnet.PublicSubnet0.availability_zone"
-    Application = "Stack Name" #TODO How?
     Network     = "Public"
   }
 }
@@ -32,7 +29,6 @@ resource "aws_subnet" "PublicSubnet1" {
 
   tags = {
     Name        = "VPCNameParameter-public-+ aws_wordpress_public_subnet.PublicSubnet1.availability_zone"
-    Application = "Stack Name" #TODO How?
     Network     = "Public"
   }
 }
@@ -45,7 +41,6 @@ resource "aws_subnet" "PrivateSubnet0" {
 
   tags = {
     Name        = "VPCNameParameter-private-+ aws_wordpress_private_subnet.PrivateSubnet0.availability_zone"
-    Application = "Stack Name" #TODO How?
     Network     = "Private"
   }
 }
@@ -58,7 +53,6 @@ resource "aws_subnet" "PrivateSubnet1" {
 
   tags = {
     Name        = "VPCNameParameter-private-+ aws_wordpress_private_subnet.PrivateSubnet1.availability_zone"
-    Application = "Stack Name" #TODO How?
     Network     = "Private"
   }
 }
@@ -68,7 +62,6 @@ resource "aws_internet_gateway" "InternetGateway" {
 
   tags = {
     Name        = "VPCNameParameter-public-+ aws_vpc.wordpress_vpc.name-IGW"
-    Application = "Stack Name" #TODO How?
     Network     = "Public"
   }
 }
@@ -181,7 +174,6 @@ resource "aws_route_table" "PrivateRouteTable0" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    # gateway_id = aws_internet_gateway.InternetGateway.id
     nat_gateway_id = aws_nat_gateway.NATGateway0.id
   }
 
@@ -197,7 +189,6 @@ resource "aws_route_table" "PrivateRouteTable1" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    # gateway_id = aws_internet_gateway.InternetGateway.id
     nat_gateway_id = aws_nat_gateway.NATGateway1.id
   }
 
