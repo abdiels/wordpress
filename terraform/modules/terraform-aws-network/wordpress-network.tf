@@ -66,11 +66,6 @@ resource "aws_internet_gateway" "InternetGateway" {
   }
 }
 
-resource "aws_internet_gateway_attachment" "GatewayToInternet" {
-  internet_gateway_id = aws_internet_gateway.InternetGateway.id
-  vpc_id              = aws_vpc.wordpress_vpc.id
-}
-
 resource "aws_route_table" "PublicRouteTable" {
   vpc_id = aws_vpc.wordpress_vpc.id
 
