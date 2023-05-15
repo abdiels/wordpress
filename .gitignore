@@ -1,5 +1,5 @@
 /.DS_Store
 /.idea
 /blog.iml
-/.terraform
+/terraform/.terraform
 blog.iml
